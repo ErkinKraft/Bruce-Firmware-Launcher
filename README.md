@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="bLogo.png" alt="Bruce Launcher Logo" width="140">
+  <img src="wLogo.png" alt="Bruce Launcher Logo" width="140">
 </p>
 
 <p align="center">
@@ -205,4 +205,5 @@ Most of these can be adjusted from the **Settings** dialog inside the app.
 - **Bruce firmware & ecosystem**: [`BruceDevices/firmware`](https://github.com/BruceDevices/firmware) and the community around `bruce.computer`.
 
 If you find this launcher useful, consider starring the repo on GitHub and opening issues / PRs for ideas and improvements. 🙂
+
 
