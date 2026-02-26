@@ -34,6 +34,17 @@ def get_resource_path(name: str) -> str:
     return os.path.join(base_dir, name)
 
 
+def get_python_cmd() -> str:
+    """возвращаем чем именно дергать esptool чтоб собранный exe не запускал сам себя по кругу"""
+    if getattr(sys, "frozen", False):
+        # в сборке через pyinstaller sys.executable указывает на этот лаунчер
+        # поэтому тут просто полагаемся на системный python/py
+        if sys.platform == "win32":
+            return "py"
+        return "python3"
+    return sys.executable
+
+
 class AppSettings:
     def __init__(self):
         os.makedirs(APP_DIR, exist_ok=True)
@@ -1341,7 +1352,7 @@ class BruceLauncher(QtWidgets.QMainWindow):
     def _run_esptool_flash(self, port: str, path: str, erase_flash: bool, progress: "ProgressDialog | None"):
         chip = self.settings.chip_type
         base_cmd = [
-            sys.executable,
+            get_python_cmd(),
             "-m",
             "esptool",
             "--chip",
@@ -1475,7 +1486,7 @@ class BruceLauncher(QtWidgets.QMainWindow):
     def _detect_flash_size(self, port: str):
         chip = self.settings.chip_type
         cmd = [
-            sys.executable,
+            get_python_cmd(),
             "-m",
             "esptool",
             "--chip",
@@ -1508,7 +1519,7 @@ class BruceLauncher(QtWidgets.QMainWindow):
     def _run_esptool_backup(self, port: str, size: int, path: str, offset_hex: str = "0x0", progress: "ProgressDialog | None" = None):
         chip = self.settings.chip_type
         cmd = [
-            sys.executable,
+            get_python_cmd(),
             "-m",
             "esptool",
             "--chip",
@@ -1604,7 +1615,7 @@ class BruceLauncher(QtWidgets.QMainWindow):
     def _run_esptool_restore(self, port: str, path: str):
         chip = self.settings.chip_type
         cmd = [
-            sys.executable,
+            get_python_cmd(),
             "-m",
             "esptool",
             "--chip",
