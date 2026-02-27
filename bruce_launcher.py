@@ -18,6 +18,7 @@ except ImportError:
 
 
 GITHUB_API_RELEASES = "https://api.github.com/repos/BruceDevices/firmware/releases"
+APP_VERSION = "V1.2"
 APP_DIR = os.path.join(os.path.expanduser("~"), "BruceLauncher")
 SETTINGS_PATH = os.path.join(APP_DIR, "settings.json")
 
@@ -271,8 +272,13 @@ class BruceStyle:
 
 
 class SerialConsole(QtWidgets.QDialog):
-    def __init__(self, parent=None, send_tone_on_connect: bool = True):
+    def __init__(self, parent=None, send_tone_on_connect: bool = True, language: str = "ru"):
         super().__init__(parent)
+        self._language = language if language in ("ru", "en") else "ru"
+
+        def _t(ru: str, en: str) -> str:
+            return en if self._language == "en" else ru
+
         self.setWindowTitle("Bruce Serial Console")
         # убрал эту дурацкую кнопку с вопросиком вверху она тут вообще не нужна
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
@@ -283,8 +289,8 @@ class SerialConsole(QtWidgets.QDialog):
         self.baud_box.addItems(["115200", "921600"])
         self.refresh_ports()
 
-        self.open_btn = QtWidgets.QPushButton("Открыть")
-        self.close_btn = QtWidgets.QPushButton("Закрыть")
+        self.open_btn = QtWidgets.QPushButton(_t("Открыть", "Open"))
+        self.close_btn = QtWidgets.QPushButton(_t("Закрыть", "Close"))
         self.close_btn.setEnabled(False)
 
         self.text = QtWidgets.QPlainTextEdit()
@@ -292,17 +298,19 @@ class SerialConsole(QtWidgets.QDialog):
 
         # это типа верхняя панель тут порт скорость и всякие кнопки
         top = QtWidgets.QHBoxLayout()
-        top.addWidget(QtWidgets.QLabel("Порт:"))
+        top.addWidget(QtWidgets.QLabel(_t("Порт:", "Port:")))
         top.addWidget(self.port_box)
-        top.addWidget(QtWidgets.QLabel("Скорость:"))
+        top.addWidget(QtWidgets.QLabel(_t("Скорость:", "Baudrate:")))
         top.addWidget(self.baud_box)
         top.addWidget(self.open_btn)
         top.addWidget(self.close_btn)
 
         # Нижняя панель ввода команды
         self.input_edit = QtWidgets.QLineEdit()
-        self.input_edit.setPlaceholderText("Команда для отправки на устройство...")
-        self.send_btn = QtWidgets.QPushButton("Отправить")
+        self.input_edit.setPlaceholderText(
+            _t("Команда для отправки на устройство...", "Command to send to device...")
+        )
+        self.send_btn = QtWidgets.QPushButton(_t("Отправить", "Send"))
         self.send_btn.setEnabled(False)
 
         bottom = QtWidgets.QHBoxLayout()
@@ -334,13 +342,21 @@ class SerialConsole(QtWidgets.QDialog):
     def open_port(self):
         device = self.port_box.currentData()
         if not device:
-            QtWidgets.QMessageBox.warning(self, "Serial", "Не найден доступный COM порт.")
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Serial",
+                "No available COM port found." if self._language == "en" else "Не найден доступный COM порт.",
+            )
             return
         baud = int(self.baud_box.currentText())
         try:
             self.serial = serial.Serial(device, baudrate=baud, timeout=0.1)
         except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Serial", f"Ошибка открытия порта:\n{e}")
+            QtWidgets.QMessageBox.critical(
+                self,
+                "Serial",
+                (f"Port open error:\n{e}" if self._language == "en" else f"Ошибка открытия порта:\n{e}"),
+            )
             return
 
         # Автоматически отправляем команду tone при подключении, если включено в настройках
@@ -399,7 +415,11 @@ class SerialConsole(QtWidgets.QDialog):
             self.serial.write(cmd.encode(errors="ignore"))
             self.input_edit.clear()
         except Exception:
-            QtWidgets.QMessageBox.warning(self, "Serial", "Не удалось отправить команду.")
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Serial",
+                "Failed to send command." if self._language == "en" else "Не удалось отправить команду.",
+            )
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self.close_port()
@@ -636,11 +656,17 @@ class ProgressDialog(QtWidgets.QDialog):
 
 
 class SettingsDialog(QtWidgets.QDialog):
-    def __init__(self, parent: QtWidgets.QWidget, settings: AppSettings):
+    def __init__(self, parent: QtWidgets.QWidget, settings: AppSettings, language: str = "ru"):
         super().__init__(parent)
-        self.setWindowTitle("Настройки")
+        self._language = language if language in ("ru", "en") else "ru"
+
+        def _t(ru: str, en: str) -> str:
+            return en if self._language == "en" else ru
+
+        self.setWindowTitle(_t("Настройки", "Settings"))
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
         self._settings = settings
+        self.resize(520, 360)
 
         fw_edit = QtWidgets.QLineEdit(settings.firmware_dir)
         fw_btn = QtWidgets.QPushButton("…")
@@ -650,18 +676,26 @@ class SettingsDialog(QtWidgets.QDialog):
         bk_btn = QtWidgets.QPushButton("…")
         bk_btn.setFixedWidth(32)
 
-        tone_chk = QtWidgets.QCheckBox("Отправлять команду 'tone' при подключении к Serial")
+        tone_chk = QtWidgets.QCheckBox(
+            _t("Отправлять команду 'tone' при подключении к Serial", "Send 'tone' command when connecting to Serial")
+        )
         tone_chk.setChecked(settings.send_tone_on_connect)
 
-        ask_fw_chk = QtWidgets.QCheckBox("Каждый раз выбирать файл для прошивки вручную")
+        ask_fw_chk = QtWidgets.QCheckBox(
+            _t("Каждый раз выбирать файл для прошивки вручную", "Ask firmware file every time")
+        )
         ask_fw_chk.setChecked(settings.ask_firmware_path_each_time)
-        ask_bk_chk = QtWidgets.QCheckBox("Каждый раз выбирать файл для бэкапа вручную")
+        ask_bk_chk = QtWidgets.QCheckBox(
+            _t("Каждый раз выбирать файл для бэкапа вручную", "Ask backup file every time")
+        )
         ask_bk_chk.setChecked(settings.ask_backup_path_each_time)
 
-        gfx_prog_chk = QtWidgets.QCheckBox("Графическое окно прогресса (сплэш при прошивке/бэкапе)")
+        gfx_prog_chk = QtWidgets.QCheckBox(
+            _t("Графическое окно прогресса (сплэш при прошивке/бэкапе)", "Graphical progress window (flash/backup)")
+        )
         gfx_prog_chk.setChecked(settings.graphic_progress)
 
-        chip_label = QtWidgets.QLabel("Чип ESP:")
+        chip_label = QtWidgets.QLabel(_t("Чип ESP:", "ESP chip:"))
         chip_combo = QtWidgets.QComboBox()
         chip_combo.addItem("ESP32", "esp32")
         chip_combo.addItem("ESP32-S3", "esp32s3")
@@ -670,43 +704,90 @@ class SettingsDialog(QtWidgets.QDialog):
         if idx >= 0:
             chip_combo.setCurrentIndex(idx)
 
+        # --- блок путей ---
         fw_row = QtWidgets.QHBoxLayout()
+        fw_row.setContentsMargins(0, 0, 0, 0)
+        fw_row.setSpacing(6)
         fw_row.addWidget(fw_edit, 1)
         fw_row.addWidget(fw_btn)
 
         bk_row = QtWidgets.QHBoxLayout()
+        bk_row.setContentsMargins(0, 0, 0, 0)
+        bk_row.setSpacing(6)
         bk_row.addWidget(bk_edit, 1)
         bk_row.addWidget(bk_btn)
 
-        form = QtWidgets.QFormLayout()
-        form.addRow("Папка для временных прошивок:", fw_row)
-        form.addRow("Папка для бэкапов:", bk_row)
-        form.addRow("", tone_chk)
-        form.addRow("", ask_fw_chk)
-        form.addRow("", ask_bk_chk)
-        form.addRow(chip_label, chip_combo)
-        form.addRow("", gfx_prog_chk)
+        paths_form = QtWidgets.QFormLayout()
+        paths_form.setLabelAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        paths_form.setFormAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        paths_form.setHorizontalSpacing(10)
+        paths_form.setVerticalSpacing(8)
+        paths_form.addRow(_t("Папка для временных прошивок:", "Folder for temporary firmware files:"), fw_row)
+        paths_form.addRow("", ask_fw_chk)
+        paths_form.addRow(_t("Папка для бэкапов:", "Folder for backups:"), bk_row)
+        paths_form.addRow("", ask_bk_chk)
+
+        paths_group = QtWidgets.QGroupBox(_t("Пути и файлы", "Paths and files"))
+        paths_group.setLayout(paths_form)
+
+        # --- блок поведения ---
+        behavior_layout = QtWidgets.QVBoxLayout()
+        behavior_layout.setContentsMargins(8, 8, 8, 8)
+        behavior_layout.setSpacing(6)
+        behavior_layout.addWidget(tone_chk)
+
+        chip_row = QtWidgets.QHBoxLayout()
+        chip_row.addWidget(chip_label)
+        chip_row.addWidget(chip_combo, 1)
+        behavior_layout.addLayout(chip_row)
+        behavior_layout.addWidget(gfx_prog_chk)
+        behavior_layout.addStretch(1)
+
+        behavior_group = QtWidgets.QGroupBox(_t("Поведение", "Behavior"))
+        behavior_group.setLayout(behavior_layout)
 
         btn_box = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel
         )
 
         layout = QtWidgets.QVBoxLayout()
-        layout.addLayout(form)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+        layout.addWidget(paths_group)
+        layout.addWidget(behavior_group)
+        layout.addStretch(1)
         layout.addWidget(btn_box)
         self.setLayout(layout)
 
         def choose_dir(edit: QtWidgets.QLineEdit):
             path = QtWidgets.QFileDialog.getExistingDirectory(
-                self, "Выбор папки", edit.text() or APP_DIR
+                self,
+                _t("Выбор папки", "Select folder"),
+                edit.text() or APP_DIR,
             )
             if path:
                 edit.setText(path)
 
+        def update_fw_path_enabled(checked: bool):
+            enabled = not checked
+            fw_edit.setEnabled(enabled)
+            fw_btn.setEnabled(enabled)
+
+        def update_bk_path_enabled(checked: bool):
+            enabled = not checked
+            bk_edit.setEnabled(enabled)
+            bk_btn.setEnabled(enabled)
+
         fw_btn.clicked.connect(lambda: choose_dir(fw_edit))
         bk_btn.clicked.connect(lambda: choose_dir(bk_edit))
+        ask_fw_chk.toggled.connect(update_fw_path_enabled)
+        ask_bk_chk.toggled.connect(update_bk_path_enabled)
         btn_box.accepted.connect(self.accept)
         btn_box.rejected.connect(self.reject)
+
+        # начальное состояние доступности путей в зависимости от чекбоксов
+        update_fw_path_enabled(ask_fw_chk.isChecked())
+        update_bk_path_enabled(ask_bk_chk.isChecked())
 
         self._fw_edit = fw_edit
         self._bk_edit = bk_edit
@@ -728,9 +809,15 @@ class SettingsDialog(QtWidgets.QDialog):
 
 
 class AboutDialog(QtWidgets.QDialog):
-    def __init__(self, parent: QtWidgets.QWidget = None):
+    def __init__(self, parent: QtWidgets.QWidget = None, language: str = "ru", version: str = APP_VERSION):
         super().__init__(parent)
-        self.setWindowTitle("О программе Bruce Launcher")
+        self._language = language if language in ("ru", "en") else "ru"
+        self._version = version
+
+        if self._language == "en":
+            self.setWindowTitle("About Bruce Launcher")
+        else:
+            self.setWindowTitle("О программе Bruce Launcher")
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
         self.resize(420, 260)
 
@@ -750,7 +837,10 @@ class AboutDialog(QtWidgets.QDialog):
         text_box = QtWidgets.QVBoxLayout()
         title = QtWidgets.QLabel("Bruce Launcher")
         title.setObjectName("TitleLabel")
-        subtitle = QtWidgets.QLabel("Разработано ErkinKraft\nЛицензия: MIT")
+        if self._language == "en":
+            subtitle = QtWidgets.QLabel("Developed by ErkinKraft\nLicense: MIT")
+        else:
+            subtitle = QtWidgets.QLabel("Разработано ErkinKraft\nЛицензия: MIT")
         subtitle.setObjectName("SubtitleLabel")
 
         text_box.addWidget(title)
@@ -762,12 +852,22 @@ class AboutDialog(QtWidgets.QDialog):
 
         info = QtWidgets.QLabel()
         info.setTextFormat(QtCore.Qt.RichText)
-        info.setText(
-            "Удобный лаунчер для прошивки устройств Bruce ESP32,<br>"
-            "поддерживающий установку релизов, бэкапы и Serial консоль.<br>"
-            "Официальный сайт прошивки: "
-            "<a href=\"https://bruce.computer/\">bruce.computer</a>"
-        )
+        if self._language == "en":
+            info.setText(
+                "A handy launcher for flashing Bruce ESP32 devices,<br>"
+                "supporting release installation, backups and Serial console.<br>"
+                f"Current launcher version: <b>{self._version}</b><br>"
+                "Official firmware website: "
+                "<a href=\"https://bruce.computer/\">bruce.computer</a>"
+            )
+        else:
+            info.setText(
+                "Удобный лаунчер для прошивки устройств Bruce ESP32,<br>"
+                "поддерживающий установку релизов, бэкапы и Serial консоль.<br>"
+                f"Текущая версия лаунчера: <b>{self._version}</b><br>"
+                "Официальный сайт прошивки: "
+                "<a href=\"https://bruce.computer/\">bruce.computer</a>"
+            )
         info.setOpenExternalLinks(True)
         layout.addWidget(info)
 
@@ -791,9 +891,14 @@ class AboutDialog(QtWidgets.QDialog):
 class FlashConfirmDialog(QtWidgets.QDialog):
     """диалог перед тем как шить плату тут решаем стирать ли флеш и еще раз спрашиваем точно ли ты уверен"""
 
-    def __init__(self, parent, release_info: dict, port: str):
+    def __init__(self, parent, release_info: dict, port: str, language: str = "ru"):
         super().__init__(parent)
-        self.setWindowTitle("Подтверждение прошивки")
+        self._language = language if language in ("ru", "en") else "ru"
+
+        def _t(ru: str, en: str) -> str:
+            return en if self._language == "en" else ru
+
+        self.setWindowTitle(_t("Подтверждение прошивки", "Flash confirmation"))
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
         self.erase_flash = False
 
@@ -802,12 +907,20 @@ class FlashConfirmDialog(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout()
 
         text = QtWidgets.QLabel(
-            f"Будет прошита прошивка <b>{tag}</b> на устройство <b>{port}</b>"
+            _t(
+                f"Будет прошита прошивка <b>{tag}</b> на устройство <b>{port}</b>",
+                f"Firmware <b>{tag}</b> will be flashed to device <b>{port}</b>",
+            )
         )
         text.setTextFormat(QtCore.Qt.RichText)
         layout.addWidget(text)
 
-        self.erase_chk = QtWidgets.QCheckBox("Полностью стереть флеш перед прошивкой (erase_flash)")
+        self.erase_chk = QtWidgets.QCheckBox(
+            _t(
+                "Полностью стереть флеш перед прошивкой (erase_flash)",
+                "Erase flash completely before flashing (erase_flash)",
+            )
+        )
         layout.addWidget(self.erase_chk)
 
         btn_box = QtWidgets.QDialogButtonBox(
@@ -824,9 +937,14 @@ class FlashConfirmDialog(QtWidgets.QDialog):
         if self.erase_chk.isChecked():
             res = QtWidgets.QMessageBox.question(
                 self,
-                "Стирание данных",
-                "Внимание! При включённом erase_flash ВСЕ данные на устройстве будут стёрты.\n"
-                "Ты точно хочешь продолжить?",
+                "Стирание данных" if self._language == "ru" else "Data erase",
+                (
+                    "Внимание! При включённом erase_flash ВСЕ данные на устройстве будут стёрты.\n"
+                    "Ты точно хочешь продолжить?"
+                    if self._language == "ru"
+                    else "Warning! With erase_flash enabled ALL data on the device will be erased.\n"
+                    "Are you sure you want to continue?"
+                ),
             )
             if res != QtWidgets.QMessageBox.Yes:
                 self.reject()
@@ -880,7 +998,8 @@ class BruceLauncher(QtWidgets.QMainWindow):
         fw_group.setLayout(fw_l)
 
         row1 = QtWidgets.QHBoxLayout()
-        row1.addWidget(QtWidgets.QLabel("Версия:"))
+        self.fw_version_label = QtWidgets.QLabel("Версия:")
+        row1.addWidget(self.fw_version_label)
         row1.addWidget(self.releases_combo, 1)
         row1.addWidget(self.refresh_releases_btn)
         fw_l.addLayout(row1)
@@ -1033,6 +1152,10 @@ class BruceLauncher(QtWidgets.QMainWindow):
         self.settings.save()
         self.apply_language()
 
+    def _t(self, ru: str, en: str) -> str:
+        """простой помощник для перевода строк в логах и сообщениях"""
+        return en if getattr(self, "_current_language", "ru") == "en" else ru
+
     def apply_language(self):
         """тут просто руками меняем все подписи в зависимости от выбранного языка"""
         lang = self._current_language
@@ -1049,14 +1172,10 @@ class BruceLauncher(QtWidgets.QMainWindow):
             self.act_lang_en.setText("English")
 
             # заголовок и сабтайтл
-            # здесь специально тексты жёстко, чтобы не городить отдельные словари
-            for w in self.findChildren(QtWidgets.QLabel, "TitleLabel"):
-                if w.text().strip().lower().startswith("bruce launcher"):
-                    w.setText("Bruce Launcher")
-            for w in self.findChildren(QtWidgets.QLabel, "SubtitleLabel"):
-                txt = w.text().strip()
-                if "Предаторный лаунчер" in txt or "launcher" in txt.lower():
-                    w.setText("Simple flashing launcher for Bruce ESP32 devices")
+            if hasattr(self, "_header_title_label"):
+                self._header_title_label.setText("Bruce Launcher")
+            if hasattr(self, "_header_subtitle_label"):
+                self._header_subtitle_label.setText("Simple flashing launcher for Bruce ESP32 devices")
 
             # группы
             for g in self.findChildren(QtWidgets.QGroupBox):
@@ -1078,6 +1197,9 @@ class BruceLauncher(QtWidgets.QMainWindow):
             self.restore_btn.setText("Restore from backup")
             self.serial_btn.setText("Open Serial console")
 
+            if hasattr(self, "fw_version_label"):
+                self.fw_version_label.setText("Version:")
+
             self.status_bar.showMessage("Ready")
 
         else:
@@ -1090,13 +1212,10 @@ class BruceLauncher(QtWidgets.QMainWindow):
             self.act_lang_ru.setText("Русский")
             self.act_lang_en.setText("English")
 
-            for w in self.findChildren(QtWidgets.QLabel, "TitleLabel"):
-                if w.text().strip().lower().startswith("bruce launcher"):
-                    w.setText("Bruce Launcher")
-            for w in self.findChildren(QtWidgets.QLabel, "SubtitleLabel"):
-                txt = w.text().strip()
-                if "Simple flashing launcher" in txt or "launcher" in txt.lower():
-                    w.setText("Предаторный лаунчер прошивки Bruce для ESP32 устройств")
+            if hasattr(self, "_header_title_label"):
+                self._header_title_label.setText("Bruce Launcher")
+            if hasattr(self, "_header_subtitle_label"):
+                self._header_subtitle_label.setText("Простой лаунчер прошивки Bruce для устройств ESP32")
 
             for g in self.findChildren(QtWidgets.QGroupBox):
                 if g.title() == "Firmware":
@@ -1116,6 +1235,9 @@ class BruceLauncher(QtWidgets.QMainWindow):
             self.restore_btn.setText("Восстановить из бэкапа")
             self.serial_btn.setText("Открыть Serial консоль")
 
+            if hasattr(self, "fw_version_label"):
+                self.fw_version_label.setText("Версия:")
+
             self.status_bar.showMessage("Готово")
 
         # галочки на выборе языка
@@ -1133,8 +1255,12 @@ class BruceLauncher(QtWidgets.QMainWindow):
         title_font.setBold(True)
         title.setFont(title_font)
 
-        subtitle = QtWidgets.QLabel("Предаторный лаунчер прошивки Bruce для ESP32 устройств")
+        subtitle = QtWidgets.QLabel("Простой лаунчер прошивки Bruce для устройств ESP32")
         subtitle.setObjectName("SubtitleLabel")
+
+        # сохраняем ссылки на заголовок и подзаголовок, чтобы легко менять язык
+        self._header_title_label = title
+        self._header_subtitle_label = subtitle
 
         title_box.addWidget(title)
         title_box.addWidget(subtitle)
@@ -1168,7 +1294,7 @@ class BruceLauncher(QtWidgets.QMainWindow):
         self.log_signal.emit(msg)
 
     def load_releases(self):
-        self.log("Загрузка списка релизов из GitHub...")
+        self.log(self._t("Загрузка списка релизов из GitHub...", "Downloading release list from GitHub..."))
         self.releases_combo.clear()
         self.releases = []
         try:
@@ -1176,8 +1302,12 @@ class BruceLauncher(QtWidgets.QMainWindow):
             resp.raise_for_status()
             data = resp.json()
         except Exception as e:
-            self.log(f"Ошибка получения релизов: {e}")
-            QtWidgets.QMessageBox.critical(self, "GitHub", f"Не удалось получить список релизов:\n{e}")
+            self.log(self._t(f"Ошибка получения релизов: {e}", f"Error getting releases: {e}"))
+            QtWidgets.QMessageBox.critical(
+                self,
+                "GitHub",
+                self._t(f"Не удалось получить список релизов:\n{e}", f"Failed to get release list:\n{e}"),
+            )
             return
 
         for rel in data:
@@ -1194,11 +1324,15 @@ class BruceLauncher(QtWidgets.QMainWindow):
             label = f"{name} ({'beta' if prerelease else 'stable'})"
             self.releases_combo.addItem(label, tag)
 
-        self.log(f"Загружено релизов: {len(self.releases)}")
+        self.log(self._t(f"Загружено релизов: {len(self.releases)}", f"Releases loaded: {len(self.releases)}"))
 
     def _pick_release(self, kind: str):
         if not self.releases:
-            QtWidgets.QMessageBox.warning(self, "Релизы", "Список релизов пуст. Обновите список.")
+            QtWidgets.QMessageBox.warning(
+                self,
+                self._t("Релизы", "Releases"),
+                self._t("Список релизов пуст. Обновите список.", "Release list is empty. Refresh the list."),
+            )
             return None
 
         if kind in ("latest", "beta"):
@@ -1236,13 +1370,21 @@ class BruceLauncher(QtWidgets.QMainWindow):
             # 2) если prerelease нет, пробуем "beta" в имени/теге
             if beta_by_name_list:
                 return beta_by_name_list[0]
-            QtWidgets.QMessageBox.information(self, "Бета", "Бета‑версий не найдено.")
+            QtWidgets.QMessageBox.information(
+                self,
+                self._t("Бета", "Beta"),
+                self._t("Бета‑версий не найдено.", "No beta versions found."),
+            )
             return None
 
         # kind == "selected"
         idx = self.releases_combo.currentIndex()
         if idx < 0 or idx >= len(self.releases):
-            QtWidgets.QMessageBox.warning(self, "Релизы", "Выберите версию.")
+            QtWidgets.QMessageBox.warning(
+                self,
+                self._t("Релизы", "Releases"),
+                self._t("Выберите версию.", "Select a version."),
+            )
             return None
         return self.releases[idx]
 
@@ -1258,21 +1400,32 @@ class BruceLauncher(QtWidgets.QMainWindow):
 
         assets = rel.get("assets", [])
         if not assets:
-            QtWidgets.QMessageBox.warning(self, "Прошивка", "В релизе нет файлов прошивки.")
+            QtWidgets.QMessageBox.warning(
+                self,
+                self._t("Прошивка", "Firmware"),
+                self._t("В релизе нет файлов прошивки.", "This release has no firmware files."),
+            )
             return
 
         # собираем тут список всех bin файлов из этого релиза
         bin_assets = [a for a in assets if (a.get("name") or "").lower().endswith(".bin")]
         if not bin_assets:
-            QtWidgets.QMessageBox.warning(self, "Прошивка", "В релизе нет .bin файлов прошивки.")
+            QtWidgets.QMessageBox.warning(
+                self,
+                self._t("Прошивка", "Firmware"),
+                self._t("В релизе нет .bin файлов прошивки.", "No .bin firmware files found in this release."),
+            )
             return
 
         # открываем окошко где уже руками выбираем какой именно bin под свое железо ставить
         items = [a.get("name") or "firmware.bin" for a in bin_assets]
         item, ok = QtWidgets.QInputDialog.getItem(
             self,
-            "Выбор файла прошивки",
-            "Выберите файл прошивки (.bin), подходящий вашему устройству:",
+            self._t("Выбор файла прошивки", "Firmware file selection"),
+            self._t(
+                "Выберите файл прошивки (.bin), подходящий вашему устройству:",
+                "Select a firmware (.bin) file suitable for your device:",
+            ),
             items,
             0,
             False,
@@ -1293,7 +1446,7 @@ class BruceLauncher(QtWidgets.QMainWindow):
         if self.settings.ask_firmware_path_each_time:
             path, _ = QtWidgets.QFileDialog.getSaveFileName(
                 self,
-                "Куда сохранить прошивку",
+                self._t("Куда сохранить прошивку", "Where to save firmware"),
                 os.path.join(self.settings.firmware_dir, default_name),
                 "BIN files (*.bin)",
             )
@@ -1303,7 +1456,12 @@ class BruceLauncher(QtWidgets.QMainWindow):
         else:
             local_path = os.path.join(self.settings.firmware_dir, default_name)
 
-        self.log(f"Скачивание прошивки {rel['tag']} ({asset.get('name', '')})...")
+        self.log(
+            self._t(
+                f"Скачивание прошивки {rel['tag']} ({asset.get('name', '')})...",
+                f"Downloading firmware {rel['tag']} ({asset.get('name', '')})...",
+            )
+        )
 
         try:
             with requests.get(url, stream=True, timeout=60) as r:
@@ -1313,26 +1471,51 @@ class BruceLauncher(QtWidgets.QMainWindow):
                         if chunk:
                             f.write(chunk)
         except Exception as e:
-            self.log(f"Ошибка скачивания: {e}")
-            QtWidgets.QMessageBox.critical(self, "Скачивание", f"Не удалось скачать прошивку:\n{e}")
+            self.log(self._t(f"Ошибка скачивания: {e}", f"Download error: {e}"))
+            QtWidgets.QMessageBox.critical(
+                self,
+                self._t("Скачивание", "Download"),
+                self._t("Не удалось скачать прошивку:\n{e}", "Failed to download firmware:\n{e}").format(e=e),
+            )
             return
 
-        self.log(f"Прошивка сохранена: {local_path}")
+        self.log(
+            self._t(
+                f"Прошивка сохранена: {local_path}",
+                f"Firmware saved to: {local_path}",
+            )
+        )
 
         ports = list(serial.tools.list_ports.comports())
         if not ports:
-            QtWidgets.QMessageBox.warning(self, "Прошивка", "ESP32 устройство не найдено (COM порт).")
+            QtWidgets.QMessageBox.warning(
+                self,
+                self._t("Прошивка", "Firmware"),
+                self._t("ESP32 устройство не найдено (COM порт).", "ESP32 device not found (COM port)."),
+            )
             return
 
         items = [f"{p.device} - {p.description}" for p in ports]
-        item, ok = QtWidgets.QInputDialog.getItem(self, "Выбор порта", "COM порт:", items, 0, False)
+        item, ok = QtWidgets.QInputDialog.getItem(
+            self,
+            self._t("Выбор порта", "Port selection"),
+            self._t("COM порт:", "COM port:"),
+            items,
+            0,
+            False,
+        )
         if not ok:
             return
         sel_idx = items.index(item)
         port = ports[sel_idx].device
 
         # перед прошивкой еще раз выскакивает окно чтоб точно подтвердить и можно включить стирание флеша
-        confirm = FlashConfirmDialog(self, rel, port)
+        confirm = FlashConfirmDialog(
+            self,
+            rel,
+            port,
+            language=getattr(self, "_current_language", "ru"),
+        )
         if confirm.exec_() != QtWidgets.QDialog.Accepted:
             return
         erase_flash = confirm.erase_flash
@@ -1388,30 +1571,44 @@ class BruceLauncher(QtWidgets.QMainWindow):
                 proc.wait()
                 return proc.returncode
             except Exception as e:
-                self.log(f"Ошибка запуска esptool: {e}")
+                self.log(self._t(f"Ошибка запуска esptool: {e}", f"Error starting esptool: {e}"))
                 return -1
 
         # если юзер включил стирание флеша то сначала пробуем его почистить а уже потом шить
         if erase_flash:
-            rc = run_cmd(base_cmd + ["erase_flash"], "Стирание флеша (erase_flash)...")
+            rc = run_cmd(
+                base_cmd + ["erase_flash"],
+                self._t("Стирание флеша (erase_flash)...", "Erasing flash (erase_flash)..."),
+            )
             if rc != 0:
-                self.log("Стирание флеша завершилось с ошибкой, прошивка отменена.")
+                self.log(
+                    self._t(
+                        "Стирание флеша завершилось с ошибкой, прошивка отменена.",
+                        "Flash erase finished with error, flashing cancelled.",
+                    )
+                )
                 if progress is not None:
                     try:
                         QtCore.QMetaObject.invokeMethod(
                             progress,
                             "set_message",
                             QtCore.Qt.QueuedConnection,
-                            QtCore.Q_ARG(str, "Ошибка стирания флеша."),
+                            QtCore.Q_ARG(
+                                str,
+                                self._t("Ошибка стирания флеша.", "Flash erase error."),
+                            ),
                         )
                     except Exception:
                         pass
                 return
 
         # основная прошивка здесь без всяких фокусов просто пишем bin по адресу ноль
-        rc = run_cmd(base_cmd + ["write_flash", "0x0", path], "Запись прошивки во флеш...")
+        rc = run_cmd(
+            base_cmd + ["write_flash", "0x0", path],
+            self._t("Запись прошивки во флеш...", "Writing firmware to flash..."),
+        )
         if rc == 0:
-            self.log("Прошивка завершена успешно.")
+            self.log(self._t("Прошивка завершена успешно.", "Flashing completed successfully."))
             # если все ок то удаляем за собой файлик прошивки чтоб не валялся зря
             try:
                 if os.path.isfile(path):
@@ -1424,19 +1621,33 @@ class BruceLauncher(QtWidgets.QMainWindow):
                         progress,
                         "set_success",
                         QtCore.Qt.QueuedConnection,
-                        QtCore.Q_ARG(str, "Прошивка завершена успешно."),
+                        QtCore.Q_ARG(
+                            str,
+                            self._t("Прошивка завершена успешно.", "Flashing completed successfully."),
+                        ),
                     )
                 except Exception:
                     pass
         else:
-            self.log(f"Ошибка прошивки, код {rc}")
+            self.log(
+                self._t(
+                    f"Ошибка прошивки, код {rc}",
+                    f"Flashing error, code {rc}",
+                )
+            )
             if progress is not None:
                 try:
                     QtCore.QMetaObject.invokeMethod(
                         progress,
                         "set_message",
                         QtCore.Qt.QueuedConnection,
-                        QtCore.Q_ARG(str, f"Ошибка прошивки, код {rc}."),
+                        QtCore.Q_ARG(
+                            str,
+                            self._t(
+                                f"Ошибка прошивки, код {rc}.",
+                                f"Flashing error, code {rc}.",
+                            ),
+                        ),
                     )
                 except Exception:
                     pass
@@ -1444,11 +1655,22 @@ class BruceLauncher(QtWidgets.QMainWindow):
     def create_backup(self):
         ports = list(serial.tools.list_ports.comports())
         if not ports:
-            QtWidgets.QMessageBox.warning(self, "Бэкап", "ESP32 устройство не найдено (COM порт).")
+            QtWidgets.QMessageBox.warning(
+                self,
+                self._t("Бэкап", "Backup"),
+                self._t("ESP32 устройство не найдено (COM порт).", "ESP32 device not found (COM port)."),
+            )
             return
 
         items = [f"{p.device} - {p.description}" for p in ports]
-        item, ok = QtWidgets.QInputDialog.getItem(self, "Выбор порта", "COM порт:", items, 0, False)
+        item, ok = QtWidgets.QInputDialog.getItem(
+            self,
+            self._t("Выбор порта", "Port selection"),
+            self._t("COM порт:", "COM port:"),
+            items,
+            0,
+            False,
+        )
         if not ok:
             return
         sel_idx = items.index(item)
@@ -1460,7 +1682,10 @@ class BruceLauncher(QtWidgets.QMainWindow):
 
         if self.settings.ask_backup_path_each_time:
             path, _ = QtWidgets.QFileDialog.getSaveFileName(
-                self, "Сохранить бэкап", os.path.join(save_dir, default_name), "BIN files (*.bin)"
+                self,
+                self._t("Сохранить бэкап", "Save backup"),
+                os.path.join(save_dir, default_name),
+                "BIN files (*.bin)",
             )
             if not path:
                 return
@@ -1470,11 +1695,20 @@ class BruceLauncher(QtWidgets.QMainWindow):
         # размер флеша сначала пытаемся вытащить через esptool flash_id
         # если вдруг не смогли тогда просто берем по старинке 16мб
         flash_size = self._detect_flash_size(port) or (16 * 1024 * 1024)
-        self.log(f"Создание ПОЛНОГО бэкапа с устройства {port} (объём {flash_size} байт)...")
+        self.log(
+            self._t(
+                f"Создание ПОЛНОГО бэкапа с устройства {port} (объём {flash_size} байт)...",
+                f"Creating FULL backup from device {port} (size {flash_size} bytes)...",
+            )
+        )
 
         progress = None
         if self.settings.graphic_progress:
-            progress = ProgressDialog(self, "Бэкап", "Чтение флеша устройства...")
+            progress = ProgressDialog(
+                self,
+                self._t("Бэкап", "Backup"),
+                self._t("Чтение флеша устройства...", "Reading device flash..."),
+            )
             progress.show()
 
         Thread(
@@ -1546,14 +1780,17 @@ class BruceLauncher(QtWidgets.QMainWindow):
                 self.log(line.rstrip("\n"))
             proc.wait()
             if proc.returncode == 0:
-                self.log("Бэкап успешно создан.")
+                self.log(self._t("Бэкап успешно создан.", "Backup created successfully."))
                 if progress is not None:
                     try:
                         QtCore.QMetaObject.invokeMethod(
                             progress,
                             "set_success",
                             QtCore.Qt.QueuedConnection,
-                            QtCore.Q_ARG(str, "Бэкап успешно создан."),
+                            QtCore.Q_ARG(
+                                str,
+                                self._t("Бэкап успешно создан.", "Backup created successfully."),
+                            ),
                         )
                     except Exception:
                         pass
@@ -1569,34 +1806,59 @@ class BruceLauncher(QtWidgets.QMainWindow):
                 except Exception:
                     pass
             else:
-                self.log(f"Ошибка бэкапа, код {proc.returncode}")
+                self.log(
+                    self._t(
+                        f"Ошибка бэкапа, код {proc.returncode}",
+                        f"Backup error, code {proc.returncode}",
+                    )
+                )
                 if progress is not None:
                     try:
                         QtCore.QMetaObject.invokeMethod(
                             progress,
                             "set_message",
                             QtCore.Qt.QueuedConnection,
-                            QtCore.Q_ARG(str, f"Ошибка бэкапа, код {proc.returncode}."),
+                            QtCore.Q_ARG(
+                                str,
+                                self._t(
+                                    f"Ошибка бэкапа, код {proc.returncode}.",
+                                    f"Backup error, code {proc.returncode}.",
+                                ),
+                            ),
                         )
                     except Exception:
                         pass
         except Exception as e:
-            self.log(f"Ошибка запуска esptool: {e}")
+            self.log(self._t(f"Ошибка запуска esptool: {e}", f"Error starting esptool: {e}"))
 
     def restore_backup(self):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Выбрать файл бэкапа", "", "BIN files (*.bin)"
+            self,
+            self._t("Выбрать файл бэкапа", "Select backup file"),
+            "",
+            "BIN files (*.bin)",
         )
         if not path:
             return
 
         ports = list(serial.tools.list_ports.comports())
         if not ports:
-            QtWidgets.QMessageBox.warning(self, "Бэкап", "ESP32 устройство не найдено (COM порт).")
+            QtWidgets.QMessageBox.warning(
+                self,
+                self._t("Бэкап", "Backup"),
+                self._t("ESP32 устройство не найдено (COM порт).", "ESP32 device not found (COM port)."),
+            )
             return
 
         items = [f"{p.device} - {p.description}" for p in ports]
-        item, ok = QtWidgets.QInputDialog.getItem(self, "Выбор порта", "COM порт:", items, 0, False)
+        item, ok = QtWidgets.QInputDialog.getItem(
+            self,
+            self._t("Выбор порта", "Port selection"),
+            self._t("COM порт:", "COM port:"),
+            items,
+            0,
+            False,
+        )
         if not ok:
             return
         sel_idx = items.index(item)
@@ -1604,12 +1866,20 @@ class BruceLauncher(QtWidgets.QMainWindow):
 
         if QtWidgets.QMessageBox.question(
             self,
-            "Подтверждение",
-            f"Перезаписать флеш устройства {port} содержимым бэкапа?\nДействие нельзя отменить."
+            self._t("Подтверждение", "Confirmation"),
+            self._t(
+                f"Перезаписать флеш устройства {port} содержимым бэкапа?\nДействие нельзя отменить.",
+                f"Overwrite device {port} flash with backup contents?\nThis action cannot be undone.",
+            ),
         ) != QtWidgets.QMessageBox.Yes:
             return
 
-        self.log(f"Восстановление бэкапа на {port}...")
+        self.log(
+            self._t(
+                f"Восстановление бэкапа на {port}...",
+                f"Restoring backup to {port}...",
+            )
+        )
         Thread(target=self._run_esptool_restore, args=(port, path), daemon=True).start()
 
     def _run_esptool_restore(self, port: str, path: str):
@@ -1641,26 +1911,35 @@ class BruceLauncher(QtWidgets.QMainWindow):
                 self.log(line.rstrip("\n"))
             proc.wait()
             if proc.returncode == 0:
-                self.log("Бэкап успешно восстановлен.")
+                self.log(self._t("Бэкап успешно восстановлен.", "Backup restored successfully."))
             else:
-                self.log(f"Ошибка восстановления, код {proc.returncode}")
+                self.log(
+                    self._t(
+                        f"Ошибка восстановления, код {proc.returncode}",
+                        f"Restore error, code {proc.returncode}",
+                    )
+                )
         except Exception as e:
-            self.log(f"Ошибка запуска esptool: {e}")
+            self.log(self._t(f"Ошибка запуска esptool: {e}", f"Error starting esptool: {e}"))
 
     def open_serial(self):
-        dlg = SerialConsole(self, send_tone_on_connect=self.settings.send_tone_on_connect)
+        dlg = SerialConsole(
+            self,
+            send_tone_on_connect=self.settings.send_tone_on_connect,
+            language=getattr(self, "_current_language", "ru"),
+        )
         dlg.refresh_ports()
         dlg.exec_()
 
     def open_settings(self):
-        dlg = SettingsDialog(self, self.settings)
+        dlg = SettingsDialog(self, self.settings, language=getattr(self, "_current_language", "ru"))
         if dlg.exec_() == QtWidgets.QDialog.Accepted:
             self.settings = dlg.apply_changes()
             self.settings.save()
             self.log("Настройки сохранены.")
 
     def show_about(self):
-        dlg = AboutDialog(self)
+        dlg = AboutDialog(self, language=getattr(self, "_current_language", "ru"), version=APP_VERSION)
         dlg.exec_()
 
 
